@@ -1,16 +1,27 @@
-ё  # идет на python >=3.7 and <=3.11
+# идет на python >=3.7 and <=3.11
 import os
-
 import cv2
 import numpy as np
+import pytesseract
 from sklearn.cluster import KMeans
 from ultralytics import YOLO
 
-IMGSZ = (1120, 1280)
-
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+
+IMGSZ = (1120, 1280)
 # путь до папки с классифицированными изображениями
 path_to_imgs = "../data_gagarin/data/"
+imgs_to_text = "./results/"
+
+img_paths = [path_to_imgs + i for i in os.listdir(path_to_imgs)]
+img_to_text_paths = [imgs_to_text + i for i in os.listdir(imgs_to_text)]
+
+model_path = r"C:\Users\ivano\Desktop\winwinhack\best_model\best.pt"
+
+custom_config = r"tessedit_char_whitelist=0123456789 --oem 3 --psm 7 --dpi 96"  #
+# custom_config_alpha = r"tessedit_char_whitelist=0123456789ABEKMNOPCTYX --dpi 100"   # --user-words user_word.txt
 
 
 def enhance_image(image):
@@ -48,7 +59,7 @@ def rework(image):
     return result
 
 
-def cropp_imgs(preds):
+def cropp_imgs_to_text(preds, config):  #
     """
     Функция для вырезания предсказанных Bounding boxes
     из исходных изображений
@@ -56,29 +67,33 @@ def cropp_imgs(preds):
     input -> предсказания
     output -> папка results с обрезанными картинками
     """
+    texts = []
+    texts_dict = {}
     for iter in range(len(preds)):
         img = preds[iter].orig_img
         try:
             x, y, x_1, y_1 = [
-                int(i) for i in list(preds[iter].boxes.xyxy[0].to("cpu").numpy())
+                round(i) for i in list(preds[iter].boxes.xyxy[0].to("cpu").numpy())
             ]
 
             roi_color = img[y:y_1, x:x_1]
-
-            # image = rework(roi_color)
-            # обрезанная картинка в переменной roi_color
-
+            roi_color = rework(roi_color)
             name = preds[iter].path.split("/")[-1]
-            cv2.imwrite(f"./results/{name}.jpg", roi_color)
+            # cv2.imwrite(f"./results/{name[:-4]}.jpg", roi_color)
+            text = pytesseract.image_to_string(roi_color, lang="eng", config=config)  #
+            texts.append("".join(c if c.isdigit() else "" for c in text))
+            texts_dict[name] = "".join(
+                c if c.isdigit() else "" for c in text
+            )  # or c.isalpha()
         except:
             continue
 
+    return texts, texts_dict
+
 
 # инициализируем модель и загружаем веса
-model = YOLO("path/to/model.pt")
+model = YOLO(model_path)
 # делаем предсказания
-preds = model.predict(
-    [path_to_imgs + i for i in os.listdir(path_to_imgs)], save=True, imgsz=IMGSZ
-)
+preds = model.predict(img_paths[:50], save=True, imgsz=IMGSZ)
 # вырезаем и сохраняем картинки
-cropp_imgs(preds)
+texts, texts_dict = cropp_imgs_to_text(preds, custom_config)  #

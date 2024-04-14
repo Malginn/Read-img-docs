@@ -44,10 +44,6 @@ def rework(image):
     result = np.where(mask.reshape(image.shape[:2]), 255, 0).astype(np.uint8)
     result = cv2.bitwise_not(result)
 
-    # result = cv2.GaussianBlur(result, (3, 3), 0)
-    # result = erode_(result)
-    # result = delay_(result)
-
     _, result = cv2.threshold(result, 100, 255, cv2.THRESH_BINARY)  # 180
     return result
 
